@@ -3,24 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bomberman Multijoueur</title>
-    <!-- Prévient la requête de favicon vide -->
+    <title>Bomberman Network - GitHub Pages</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
+    <!-- PeerJS pour le multijoueur réseau sans serveur -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-    <h1>Bomberman - GitHub Pages</h1>
-    
+    <h1>Bomberman Multijoueur Réseau</h1>
+
+    <div id="network-panel">
+        <button id="hostBtn" onclick="startHost()">Créer une partie (Hôte)</button>
+        <div id="host-info" style="display:none;">
+            <span>Code de la partie : <strong id="roomCode">...</strong></span>
+        </div>
+        <hr>
+        <input type="text" id="joinCodeInput" placeholder="Entrer le code de partie">
+        <button id="joinBtn" onclick="joinGame()">Rejoindre</button>
+    </div>
+
     <div class="controls-info">
-        <div class="p1-info"><strong>Joueur 1 (Bleu) :</strong> ZQSD pour bouger | ESPACE pour poser une bombe</div>
-        <div class="p2-info"><strong>Joueur 2 (Rouge) :</strong> Flèches pour bouger | ENTRÉE pour poser une bombe</div>
+        <div><strong>Commandes :</strong> ZQSD ou Flèches pour bouger | ESPACE pour poser une bombe</div>
     </div>
 
     <canvas id="gameCanvas" width="520" height="440"></canvas>
-    
     <h2 id="status"></h2>
-    <button id="restartBtn" onclick="initGame()">Recommencer la partie</button>
 
     <script src="game.js"></script>
 </body>
