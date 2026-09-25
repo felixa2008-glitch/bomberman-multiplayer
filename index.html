@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bomberman Multijoueur</title>
+    <!-- Prévient la requête de favicon vide -->
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>Bomberman - GitHub Pages</h1>
+    
+    <div class="controls-info">
+        <div class="p1-info"><strong>Joueur 1 (Bleu) :</strong> ZQSD pour bouger | ESPACE pour poser une bombe</div>
+        <div class="p2-info"><strong>Joueur 2 (Rouge) :</strong> Flèches pour bouger | ENTRÉE pour poser une bombe</div>
+    </div>
+
+    <canvas id="gameCanvas" width="520" height="440"></canvas>
+    
+    <h2 id="status"></h2>
+    <button id="restartBtn" onclick="initGame()">Recommencer la partie</button>
+
+    <script src="game.js"></script>
+</body>
+</html>
