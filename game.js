@@ -9,24 +9,107 @@ const EMPTY = 0;
 const WALL = 1;
 const BLOCK = 2;
 const BOMB = 3;
+const FIRE = 4;
 
 let map = [];
 let players = {};
+let myId = null;
+let isHost = false;
+let peer = null;
+let hostConn = null;
+let clientConns = [];
+
+// --- LOGIQUE RÉSEAU (PEERJS) ---
+
+function initPeer() {
+    peer = new Peer();
+
+    peer.on('open', (id) => {
+        myId = id;
+    });
+
+    peer.on('connection', (conn) => {
+        if (!isHost) return;
+        clientConns.push(conn);
+
+        // Assigner un joueur réseau (P2)
+        const p2Id = conn.peer;
+        players[p2Id] = { x: GRID_WIDTH - 2, y: GRID_HEIGHT - 2, color: '#ff4444', isAlive: true };
+
+        conn.on('data', (data) => {
+            handleClientInput(p2Id, data);
+        });
+
+        conn.on('open', () => {
+            broadcastState();
+        });
+    });
+}
+
+function startHost() {
+    isHost = true;
+    initPeer();
+
+    peer.on('open', (id) => {
+        const shortCode = id.substring(0, 5);
+        document.getElementById('roomCode').innerText = shortCode;
+        document.getElementById('host-info').style.display = 'block';
+        document.getElementById('status').innerText = "En attente d'un second joueur...";
+
+        map = generateMap();
+        players[id] = { x: 1, y: 1, color: '#00eeff', isAlive: true };
+    });
+}
+
+function joinGame() {
+    isHost = false;
+    const code = document.getElementById('joinCodeInput').value.trim();
+    if (!code) return;
+
+    peer = new Peer();
+    peer.on('open', (id) => {
+        myId = id;
+        // Connexion à l'hôte
+        peer.listAllPeers((peers) => {
+            const targetPeer = peers.find(p => p.startsWith(code));
+            const hostId = targetPeer || code;
+            hostConn = peer.connect(hostId);
+
+            hostConn.on('open', () => {
+                document.getElementById('status').innerText = "Connecté au réseau !";
+            });
+
+            hostConn.on('data', (data) => {
+                map = data.map;
+                players = data.players;
+                if (data.statusText) {
+                    document.getElementById('status').innerText = data.statusText;
+                }
+            });
+        });
+    });
+}
+
+function broadcastState(statusText = "") {
+    if (!isHost) return;
+    const state = { map, players, statusText };
+    clientConns.forEach(conn => {
+        if (conn.open) conn.send(state);
+    });
+}
+
+// --- LOGIQUE DE JEU ---
 
 function generateMap() {
     let newMap = [];
     for (let y = 0; y < GRID_HEIGHT; y++) {
         let row = [];
         for (let x = 0; x < GRID_WIDTH; x++) {
-            // Piliers et bordures
             if (y === 0 || y === GRID_HEIGHT - 1 || x === 0 || x === GRID_WIDTH - 1 || (x % 2 === 0 && y % 2 === 0)) {
                 row.push(WALL);
-            } 
-            // Blocs destructibles (avec zone de départ sécurisée pour P1 et P2)
-            else if (Math.random() < 0.35 && !(x <= 2 && y <= 2) && !(x >= GRID_WIDTH - 3 && y >= GRID_HEIGHT - 3)) {
+            } else if (Math.random() < 0.35 && !(x <= 2 && y <= 2) && !(x >= GRID_WIDTH - 3 && y >= GRID_HEIGHT - 3)) {
                 row.push(BLOCK);
-            } 
-            else {
+            } else {
                 row.push(EMPTY);
             }
         }
@@ -35,43 +118,34 @@ function generateMap() {
     return newMap;
 }
 
-function initGame() {
-    map = generateMap();
-    document.getElementById('status').innerText = "";
-    
-    players = {
-        p1: { x: 1, y: 1, color: '#00eeff', isAlive: true, name: "Joueur 1 (Bleu)" },
-        p2: { x: GRID_WIDTH - 2, y: GRID_HEIGHT - 2, color: '#ff4444', isAlive: true, name: "Joueur 2 (Rouge)" }
-    };
-}
+function handleClientInput(playerId, action) {
+    const p = players[playerId];
+    if (!p || !p.isAlive) return;
 
-function movePlayer(player, dx, dy) {
-    if (!player.isAlive) return;
-
-    const targetX = player.x + dx;
-    const targetY = player.y + dy;
-
-    // Déplacement case par case : Murs (1) et Blocs (2) bloquent.
-    // Les bombes (3) et les cases vides (0) sont entièrement traversables.
-    if (targetX >= 0 && targetX < GRID_WIDTH && targetY >= 0 && targetY < GRID_HEIGHT) {
-        const cell = map[targetY][targetX];
-        if (cell !== WALL && cell !== BLOCK) {
-            player.x = targetX;
-            player.y = targetY;
+    if (action.type === 'move') {
+        const targetX = p.x + action.dx;
+        const targetY = p.y + action.dy;
+        if (targetX >= 0 && targetX < GRID_WIDTH && targetY >= 0 && targetY < GRID_HEIGHT) {
+            const cell = map[targetY][targetX];
+            if (cell !== WALL && cell !== BLOCK) {
+                p.x = targetX;
+                p.y = targetY;
+            }
         }
+    } else if (action.type === 'bomb') {
+        placeBomb(p);
     }
+    broadcastState();
 }
 
 function placeBomb(player) {
-    if (!player.isAlive) return;
-
     const gx = player.x;
     const gy = player.y;
 
     if (map[gy][gx] === EMPTY || map[gy][gx] === BOMB) {
         map[gy][gx] = BOMB;
+        broadcastState();
 
-        // Détonation après 3 secondes
         setTimeout(() => {
             explodeBomb(gx, gy);
         }, 3000);
@@ -80,7 +154,7 @@ function placeBomb(player) {
 
 function explodeBomb(bx, by) {
     if (map[by][bx] === BOMB) {
-        map[by][bx] = EMPTY;
+        map[by][bx] = FIRE;
     }
 
     let blastArea = [{x: bx, y: by}];
@@ -93,83 +167,99 @@ function explodeBomb(bx, by) {
             let ty = by + (dy * i);
 
             if (map[ty][tx] === WALL) break;
-            
+
             blastArea.push({x: tx, y: ty});
 
             if (map[ty][tx] === BLOCK) {
-                map[ty][tx] = EMPTY;
+                map[ty][tx] = FIRE;
                 break;
+            } else {
+                map[ty][tx] = FIRE;
             }
         }
     }
 
-    // Détection des éliminations
-    for (let key in players) {
-        let p = players[key];
+    // Élimination des joueurs touchés par le feu
+    for (let id in players) {
+        let p = players[id];
         if (p.isAlive) {
-            let hit = blastArea.some(cell => cell.x === p.x && cell.y === p.y);
-            if (hit) {
+            if (blastArea.some(cell => cell.x === p.x && cell.y === p.y)) {
                 p.isAlive = false;
-                checkWinner();
             }
         }
     }
+
+    broadcastState();
+
+    // Effet visuel du feu pendant 500 ms
+    setTimeout(() => {
+        blastArea.forEach(cell => {
+            if (map[cell.y][cell.x] === FIRE) {
+                map[cell.y][cell.x] = EMPTY;
+            }
+        });
+        broadcastState();
+    }, 500);
 }
 
-function checkWinner() {
-    const statusEl = document.getElementById('status');
-    if (!players.p1.isAlive && !players.p2.isAlive) {
-        statusEl.innerText = "Égalité ! Les deux joueurs sont éliminés.";
-    } else if (!players.p1.isAlive) {
-        statusEl.innerText = "Victoire du Joueur 2 (Rouge) !";
-    } else if (!players.p2.isAlive) {
-        statusEl.innerText = "Victoire du Joueur 1 (Bleu) !";
-    }
-}
-
-// Gestion des entrées clavier
+// Gestion des entrées locales
 window.addEventListener('keydown', (e) => {
-    // Joueur 1 (ZQSD + Espace)
-    if (e.key === 'z' || e.key === 'Z') movePlayer(players.p1, 0, -1);
-    if (e.key === 's' || e.key === 'S') movePlayer(players.p1, 0, 1);
-    if (e.key === 'q' || e.key === 'Q') movePlayer(players.p1, -1, 0);
-    if (e.key === 'd' || e.key === 'D') movePlayer(players.p1, 1, 0);
-    if (e.key === ' ') placeBomb(players.p1);
+    if (!myId) return;
 
-    // Joueur 2 (Flèches + Entrée)
-    if (e.key === 'ArrowUp') movePlayer(players.p2, 0, -1);
-    if (e.key === 'ArrowDown') movePlayer(players.p2, 0, 1);
-    if (e.key === 'ArrowLeft') movePlayer(players.p2, -1, 0);
-    if (e.key === 'ArrowRight') movePlayer(players.p2, 1, 0);
-    if (e.key === 'Enter') placeBomb(players.p2);
+    let action = null;
+    if (e.key === 'z' || e.key === 'Z' || e.key === 'ArrowUp') action = { type: 'move', dx: 0, dy: -1 };
+    if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') action = { type: 'move', dx: 0, dy: 1 };
+    if (e.key === 'q' || e.key === 'Q' || e.key === 'ArrowLeft') action = { type: 'move', dx: -1, dy: 0 };
+    if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') action = { type: 'move', dx: 1, dy: 0 };
+    if (e.key === ' ' || e.key === 'Enter') action = { type: 'bomb' };
+
+    if (action) {
+        if (isHost) {
+            handleClientInput(myId, action);
+        } else if (hostConn && hostConn.open) {
+            hostConn.send(action);
+        }
+    }
 });
 
-// Boucle de rendu Canvas
+// --- DESSIN CANVAS ---
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dessin de la carte
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[y].length; x++) {
             const cell = map[y][x];
-            if (cell === WALL) {
-                ctx.fillStyle = '#666666';
-                ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            } else if (cell === BLOCK) {
+            const px = x * TILE_SIZE;
+            const py = y * TILE_SIZE;
+
+            if (cell === WALL) { // Murs incassables
+                ctx.fillStyle = '#555555';
+                ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            } else if (cell === BLOCK) { // Blocs destructibles
                 ctx.fillStyle = '#b87333';
-                ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            } else if (cell === BOMB) {
+                ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            } else if (cell === BOMB) { // Bombe noire avec centre rouge et mèche
+                ctx.fillStyle = '#111';
+                ctx.beginPath();
+                ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE / 2.8, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.fillStyle = '#ff0000';
                 ctx.beginPath();
-                ctx.arc(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+                ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE / 6, 0, Math.PI * 2);
                 ctx.fill();
+            } else if (cell === FIRE) { // Feu/Flammes
+                ctx.fillStyle = '#ff6600';
+                ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#ffff00';
+                ctx.fillRect(px + 8, py + 8, TILE_SIZE - 16, TILE_SIZE - 16);
             }
         }
     }
 
     // Dessin des joueurs
-    for (let key in players) {
-        let p = players[key];
+    for (let id in players) {
+        let p = players[id];
         if (p.isAlive) {
             ctx.fillStyle = p.color;
             ctx.fillRect(p.x * TILE_SIZE + 5, p.y * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10);
@@ -179,6 +269,4 @@ function draw() {
     requestAnimationFrame(draw);
 }
 
-// Initialisation au chargement
-initGame();
 draw();
