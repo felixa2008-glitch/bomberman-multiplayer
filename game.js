@@ -6,7 +6,7 @@ const spawns=[{x:1,y:1},{x:W-2,y:H-2},{x:W-2,y:1},{x:1,y:H-2}];
 
 function newId(){return 'bm-'+Math.random().toString(36).slice(2,10)}
 function status(s){document.getElementById('status').textContent=s}
-function lobbyData(){return{type:'lobby',players:Object.values(players).map(p=>({id:p.id,slot:p.slot})),started:gameStarted}}
+function lobbyData(){return{type:'lobby',players:Object.values(players).map(p=>({id:p.id,slot:p.slot})),started:gameStarted,map:map}}
 function updateLobby(){
  const el=document.getElementById('lobby'); if(!el)return;
  const list=Object.values(players).sort((a,b)=>a.slot-b.slot).map(p=>`P${p.slot+1}${p.id===myId?' (Host)':''}`).join('<br>');
@@ -31,7 +31,7 @@ function bindPeer(){
   const slot=Object.keys(players).length,pid=conn.peer,sp=spawns[slot];
   const p={id:pid,x:sp.x,y:sp.y,color:colors[slot],isAlive:true,slot,bomb:false,bombX:null,bombY:null};
   players[pid]=p;clientConns.push(conn);
-  conn.on('open',()=>{conn.send(lobbyData());updateLobby();broadcastLobby()});
+  conn.on('open',()=>{conn.send(lobbyData());conn.send(state());updateLobby();broadcastLobby()});
   conn.on('data',d=>{if(d?.type==='join'){conn.send(lobbyData());broadcastLobby();updateLobby();return}handleInput(pid,d)});
   conn.on('close',()=>{delete players[pid];clientConns=clientConns.filter(c=>c!==conn);broadcastLobby();updateLobby()});
   conn.on('error',()=>{delete players[pid];clientConns=clientConns.filter(c=>c!==conn);updateLobby()});
@@ -45,15 +45,15 @@ function joinGame(){
  peer.on('open',id=>{myId=id;hostConn=peer.connect(code,{reliable:true});
   hostConn.on('open',()=>{status('Connecte ! En attente du START...');hostConn.send({type:'join'})});
   hostConn.on('data',d=>{
-   if(d.type==='lobby'){players={};d.players.forEach(p=>{const s=spawns[p.slot];players[p.id]={id:p.id,x:s.x,y:s.y,color:colors[p.slot],isAlive:true,slot:p.slot,bomb:false,bombX:null,bombY:null}});gameStarted=d.started;updateLobby()}
-   else if(d.type==='state'){map=d.map;players=d.players;bombs=d.bombs||[];fires=d.fires||[];gameStarted=d.started;updateLobby()}
+   if(d.type==='lobby'){if(Array.isArray(d.map)&&d.map.length)map=d.map;players={};d.players.forEach(p=>{const s=spawns[p.slot];players[p.id]={id:p.id,x:s.x,y:s.y,color:colors[p.slot],isAlive:true,slot:p.slot,bomb:false,bombX:null,bombY:null}});gameStarted=d.started;updateLobby();draw()}
+   else if(d.type==='state'){if(Array.isArray(d.map)&&d.map.length)map=d.map;players=d.players||{};bombs=d.bombs||[];fires=d.fires||[];gameStarted=!!d.started;updateLobby()}
   });
   hostConn.on('close',()=>{gameStarted=false;status('Connexion avec le host perdue.');updateLobby()});
   hostConn.on('error',()=>{status('Connexion avec le host impossible.');hostConn=null});
  });
  peer.on('error',e=>{status('Impossible de rejoindre: '+(e.type||'inconnue'));peer=null});
 }
-function startGame(){if(!isHost||gameStarted||Object.keys(players).length<1)return;gameStarted=true;broadcast();updateLobby();}
+function startGame(){if(!isHost||gameStarted||Object.keys(players).length<1)return;gameStarted=true;updateLobby();broadcastLobby();broadcast();}
 function broadcastLobby(){if(!isHost)return;const d=lobbyData();clientConns.filter(c=>c.open).forEach(c=>c.send(d))}
 function state(){return{type:'state',map,players,bombs,fires,started:gameStarted}}
 function broadcast(){if(!isHost)return;const s=state();clientConns=clientConns.filter(c=>c.open);clientConns.forEach(c=>c.send(s))}
