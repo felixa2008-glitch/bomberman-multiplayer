@@ -1,1 +1,90 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Bomberman Online</title><link rel="stylesheet" href="style.css"><script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script></head><body><h1>Bomberman Online</h1><div id="network-panel"><button id="hostBtn" onclick="startHost()">Creer une partie</button><div id="host-info" style="display:none">Code complet : <strong id="roomCode"></strong></div><hr><input id="joinCodeInput" placeholder="Code de la partie (ex: bm-ab12cd34)"><button onclick="joinGame()">Rejoindre</button><div id="lobby"></div></div><div class="controls-info"><b>Clavier canadien QWERTY :</b> WASD / fleches = mouvement | ESPACE = bombe</div><canvas id="gameCanvas" width="520" height="440"></canvas><h2 id="status"></h2><script src="game.js"></script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bomberman // Online</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+<div class="scanlines"></div>
+<main id="menu" class="menu-shell">
+  <section class="hero">
+    <div class="eyebrow">ONLINE COMBAT // PEER NETWORK</div>
+    <h1>BOMBER<span>MAN</span></h1>
+    <p>Une partie. Quatre joueurs. Un seul terrain.</p>
+  </section>
+
+  <section class="network-card" id="network-panel">
+    <div class="card-head"><span>ROOM CONTROL</span><i></i></div>
+    <div class="actions">
+      <button id="hostBtn" class="primary" onclick="startHost()">CREER UNE PARTIE</button>
+      <div class="join-row">
+        <input id="joinCodeInput" autocomplete="off" spellcheck="false" placeholder="CODE DE LA PARTIE">
+        <button id="joinBtn" onclick="joinGame()">REJOINDRE</button>
+      </div>
+    </div>
+    <div id="host-info" class="room-code" style="display:none">
+      <span>CODE HOST</span><strong id="roomCode"></strong><small>Donne le code complet a tes amis.</small>
+    </div>
+
+    <div id="lobby" class="lobby-panel">
+      <div class="lobby-title"><span>LOBBY</span><b>4 MAX</b></div>
+      <div id="lobby-list" class="lobby-list"><div class="waiting">Aucune partie ouverte</div></div>
+    </div>
+    <div id="status" class="status">Pret.</div>
+  </section>
+
+  <section class="help-card">
+    <div><b>W A S D</b><span>ou fleches</span><small>DEPLACEMENT CASE PAR CASE</small></div>
+    <div><b>ESPACE</b><span>BOMBE</span><small>POSE ET ECHAPPE-TOI</small></div>
+  </section>
+</main>
+
+<section id="gameArea" class="game-shell">
+  <header class="hud-top">
+    <div class="brand">BM<span>//</span>ONLINE</div>
+    <div class="network-pill"><i></i><span>PEER NETWORK</span></div>
+    <div class="status-mini" id="gameStatus">LIVE</div>
+  </header>
+  <div class="arena-wrap">
+    <div class="side-panel left">
+      <div class="panel-label">PLAYERS</div>
+      <div id="game-player-list">P1 // P2 // P3 // P4</div>
+    </div>
+    <canvas id="gameCanvas" width="520" height="440"></canvas>
+    <div class="side-panel right">
+      <div class="panel-label">RULES</div>
+      <div>WASD / FLECHES</div>
+      <div>ESPACE // BOMBE</div>
+      <div>MAX // 4</div>
+    </div>
+  </div>
+  <footer class="hud-bottom"><span>CASE PAR CASE</span><span>HOST AUTORITAIRE</span><span>PEERJS / WEBRTC</span></footer>
+</section>
+<script src="game.js"></script>
+<script>
+/* Frontend-only adapter: preserves every backend ID used by game.js. */
+const lobbyObserver = new MutationObserver(() => {
+  const source = document.getElementById('lobby');
+  const list = document.getElementById('lobby-list');
+  const menu = document.getElementById('menu');
+  const game = document.getElementById('gameArea');
+  if (!source || !list) return;
+  const text = source.innerHTML;
+  const running = /Partie en cours/i.test(text);
+  if (running) {
+    if (menu) menu.style.display = 'none';
+    if (game) game.style.display = 'block';
+  } else {
+    if (menu) menu.style.display = '';
+    if (game) game.style.display = 'none';
+  }
+  const cleaned = text.replace(/<b>LOBBY<\/b><br>/i,'').replace(/<br><br>/g,'<br>');
+  list.innerHTML = cleaned || '<div class="waiting">En attente...</div>';
+});
+lobbyObserver.observe(document.getElementById('lobby'), {childList:true,subtree:true,characterData:true});
+</script>
+</body>
+</html>
