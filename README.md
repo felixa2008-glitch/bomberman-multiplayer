@@ -1,16 +1,16 @@
-# Bomberman Multijoueur (HTML5 Canvas)
+# Bomberman Multijoueur
 
-Jeu Bomberman multijoueur local exécutable entièrement sur navigateur via GitHub Pages.
+PeerJS reste utilise pour le multijoueur et l'hote reste autoritaire.
 
-## Fonctionnalités
-- Déplacement strict **case par case** sur grille.
-- Traversée libre des bombes (aucun blocage lors du dépôt).
-- Murs destructibles et explosions en croix avec portée de 2 cases.
+## Clavier canadien QWERTY
+- WASD ou fleches : deplacement case par case
+- ESPACE : bombe
+- Entree : bombe
 
-## Commandes
-- **Joueur 1 (Bleu)** : ZQSD pour se déplacer, `Espace` pour poser une bombe.
-- **Joueur 2 (Rouge)** : Flèches directionnelles pour se déplacer, `Entrée` pour poser une bombe.
+## Connexion
+1. L'hote clique Creer une partie.
+2. Il donne le **code complet** affiche a ses amis.
+3. Les amis collent ce code dans Rejoindre.
+4. Maximum 4 joueurs.
 
-## Hébergement
-1. Déposez les fichiers à la racine de votre dépôt GitHub.
-2. Activez **GitHub Pages** dans les paramètres (`Settings > Pages > Branch: main`).
+Le code complet est utilise comme Peer ID : il n'y a plus de recherche `listAllPeers`, qui empechait la connexion avec le petit code de 5 caracteres.
