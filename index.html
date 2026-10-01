@@ -64,27 +64,5 @@
   <footer class="hud-bottom"><span>CASE PAR CASE</span><span>HOST AUTORITAIRE</span><span>PEERJS / WEBRTC</span></footer>
 </section>
 <script src="game.js"></script>
-<script>
-/* Frontend-only adapter: preserves every backend ID used by game.js. */
-const lobbyObserver = new MutationObserver(() => {
-  const source = document.getElementById('lobby');
-  const list = document.getElementById('lobby-list');
-  const menu = document.getElementById('menu');
-  const game = document.getElementById('gameArea');
-  if (!source || !list) return;
-  const text = source.innerHTML;
-  const running = /Partie en cours/i.test(text);
-  if (running) {
-    if (menu) menu.style.display = 'none';
-    if (game) game.style.display = 'block';
-  } else {
-    if (menu) menu.style.display = '';
-    if (game) game.style.display = 'none';
-  }
-  const cleaned = text.replace(/<b>LOBBY<\/b><br>/i,'').replace(/<br><br>/g,'<br>');
-  list.innerHTML = cleaned || '<div class="waiting">En attente...</div>';
-});
-lobbyObserver.observe(document.getElementById('lobby'), {childList:true,subtree:true,characterData:true});
-</script>
 </body>
 </html>
